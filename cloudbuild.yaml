@@ -1,5 +1,5 @@
 steps:
-  # Build Docker image
+  # Step 1: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: 
       - 'build'
@@ -7,13 +7,13 @@ steps:
       - 'gcr.io/$PROJECT_ID/github-cloner'
       - '.'
 
-  # Push the image
+  # Step 2: Push the image to Google Container Registry (GCR) or Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - 'gcr.io/$PROJECT_ID/github-cloner'
 
-  # Deploy to Cloud Run with SSH key mounted as a secret
+  # Step 3: Deploy to Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'run'
@@ -24,10 +24,11 @@ steps:
       - '--platform'
       - 'managed'
       - '--region'
-      - 'us-central1'
+      - 'us-central1'  # Change this to your preferred region
       - '--allow-unauthenticated'
-      - '--set-secrets'
-      - '/root/.ssh/id_rsa=github-ssh-key:latest'
+
+# Set the service account with necessary permissions
+serviceAccount: projects/$PROJECT_ID/serviceAccounts/deploy@$PROJECT_ID.iam.gserviceaccount.com
 
 images:
   - 'gcr.io/$PROJECT_ID/github-cloner'
