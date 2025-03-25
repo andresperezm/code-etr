@@ -1,22 +1,37 @@
 import os
-from google.cloud import pubsub_v1
+import shutil
+import subprocess
+import tempfile
+from flask import Flask, request, jsonify
 
-project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
-subscription_id = os.environ.get("PUBSUB_SUBSCRIPTION")
+app = Flask(__name__)
 
-subscriber = pubsub_v1.SubscriberClient()
-subscription_path = subscriber.subscription_path(project_id, subscription_id)
+@app.route("/clone", methods=["POST"])
+def clone_repo():
+    data = request.get_json()
+    if not data or "url" not in data:
+        return jsonify({"error": "Missing 'url' in request"}), 400
 
-def callback(message: pubsub_v1.subscriber.message.Message) -> None:
-    print(f"Received message: {message.data.decode('utf-8')}")
-    message.ack()
+    repo_url = data["url"]
+    
+    # Create a temporary directory to clone the repo
+    temp_dir = tempfile.mkdtemp()
+    
+    try:
+        subprocess.run(["git", "clone", repo_url, temp_dir], check=True)
+        files = []
+        
+        for root, _, filenames in os.walk(temp_dir):
+            for filename in filenames:
+                files.append(os.path.relpath(os.path.join(root, filename), temp_dir))
+        
+        return jsonify({"repo_url": repo_url, "files": files})
+    
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": "Failed to clone repository", "details": str(e)}), 500
+    
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
-streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
-print(f"Listening for messages on {subscription_path}...")
-
-try:
-    streaming_pull_future.result()  # Blocks indefinitely, or until an error occurs.
-except Exception as e:
-    print(f"Listening for messages failed: {e}")
-    streaming_pull_future.cancel() # Cancel the subscriber client.
-    streaming_pull_future.result() # block until cancelled.
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
