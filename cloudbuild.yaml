@@ -16,6 +16,7 @@ steps:
   # Step 3: Deploy to Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
+      - 'beta'
       - 'run'
       - 'deploy'
       - 'github-cloner'
@@ -26,6 +27,10 @@ steps:
       - '--region'
       - 'us-central1'  # Change this to your preferred region
       - '--allow-unauthenticated'
+      - '--add-volume=name=output,type=cloud-storage,bucket=code-etr'
+      - '--add-volume-mount=volume=output,mount-path=/mnt/output'
+      - '--service-account=runtime@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--set-secrets=GITHUB_SSH_KEY=github-ssh-key:latest'
 
 # Set the service account with necessary permissions
 serviceAccount: projects/$PROJECT_ID/serviceAccounts/deploy@$PROJECT_ID.iam.gserviceaccount.com
