@@ -1,19 +1,23 @@
 steps:
-  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args:
+      - 'cp'
+      - 'gs://$_CODE_ETR_BUCKET/code_etr_$_CODE_ETR_VERSION.tar.bz2'
+      - '.'
   - name: 'gcr.io/cloud-builders/docker'
     args: 
       - 'build'
       - '-t'
       - 'gcr.io/$PROJECT_ID/github-cloner'
+      - '--build-arg'
+      - 'CODE_ETR_VERSION=$_CODE_ETR_VERSION'
       - '.'
 
-  # Step 2: Push the image to Google Container Registry (GCR) or Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - 'gcr.io/$PROJECT_ID/github-cloner'
 
-  # Step 3: Deploy to Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'beta'
@@ -27,10 +31,13 @@ steps:
       - '--region'
       - 'us-central1'  # Change this to your preferred region
       - '--allow-unauthenticated'
-      - '--add-volume=name=output,type=cloud-storage,bucket=code-etr'
+      - '--add-volume=name=output,type=cloud-storage,bucket=$_OUTPUT_BUCKET'
       - '--add-volume-mount=volume=output,mount-path=/mnt/output'
+      - '--add-volume=name=metadata,type=cloud-storage,bucket=$_METADATA_BUCKET'
+      - '--add-volume-mount=volume=metadata,mount-path=/mnt/metadata'
       - '--service-account=runtime@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-secrets=GITHUB_SSH_KEY=github-ssh-key:latest'
+      - '--set-env-vars=OUTPUT_BUCKET=$_OUTPUT_BUCKET'
 
 # Set the service account with necessary permissions
 serviceAccount: projects/$PROJECT_ID/serviceAccounts/deploy@$PROJECT_ID.iam.gserviceaccount.com
@@ -40,3 +47,9 @@ images:
 
 options:
   logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _CODE_ETR_BUCKET: code-etr
+  _OUTPUT_BUCKET: code-etr-output
+  _METADATA_BUCKET: code-etr-metadata
+  _CODE_ETR_VERSION: 0.12.1
